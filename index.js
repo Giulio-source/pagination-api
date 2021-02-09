@@ -1,35 +1,54 @@
 require("dotenv").config();
 
 const express = require("express");
+const mongoose = require("mongoose");
+const User = require("./model/UserSchema");
 const app = express();
 
-const users = [
-  { id: 1, name: "Gigi" },
-  { id: 2, name: "Luigi" },
-  { id: 3, name: "Remigio" },
-  { id: 4, name: "Marco" },
-  { id: 5, name: "Luca" },
-  { id: 6, name: "Stefano" },
-  { id: 7, name: "Michele" },
-  { id: 8, name: "Simone" },
-  { id: 9, name: "Giorgio" },
-  { id: 10, name: "Tommaso" },
-  { id: 11, name: "Giacomo" },
-  { id: 12, name: "Alex" },
-];
+mongoose.connect("mongodb://localhost/paginazione", {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
+const db = mongoose.connection;
+db.on("error", (err) => {
+  console.log(err);
+});
+db.once("open", async () => {
+  if ((await User.countDocuments().exec()) > 0) return;
 
-app.get("/users", paginatedResults(users), (req, res) => {
+  Promise.all([
+    User.create({ name: "User1" }),
+    User.create({ name: "User2" }),
+    User.create({ name: "User3" }),
+    User.create({ name: "User4" }),
+    User.create({ name: "User5" }),
+    User.create({ name: "User6" }),
+    User.create({ name: "User7" }),
+    User.create({ name: "User8" }),
+    User.create({ name: "User9" }),
+    User.create({ name: "User10" }),
+    User.create({ name: "User11" }),
+    User.create({ name: "User12" }),
+    User.create({ name: "User13" }),
+    User.create({ name: "User14" }),
+    User.create({ name: "User15" }),
+  ]).then(console.log("Added Users"));
+
+  console.log("Connected to DB");
+});
+
+app.get("/users", paginatedResults(User), (req, res) => {
   res.json(res.paginatedResults);
 });
 
 function paginatedResults(model) {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     const page = req.query.page;
-    const limit = req.query.limit;
+    const limit = parseInt(req.query.limit);
     const startIndex = (page - 1) * limit;
-    const endIndex = parseInt(startIndex) + parseInt(limit);
+    const endIndex = parseInt(startIndex) + limit;
     const results = {};
-    if (endIndex < model.length) {
+    if (endIndex < (await model.countDocuments().exec())) {
       results.next = {
         page: parseInt(page) + 1,
         limit: limit,
@@ -41,10 +60,13 @@ function paginatedResults(model) {
         limit: limit,
       };
     }
-
-    results.results = model.slice(startIndex, endIndex);
-    res.paginatedResults = results;
-    next();
+    try {
+      results.results = await model.find().limit(limit).skip(startIndex).exec();
+      res.paginatedResults = results;
+      next();
+    } catch (error) {
+      console.log(error);
+    }
   };
 }
 
